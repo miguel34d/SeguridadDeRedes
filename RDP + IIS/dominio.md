@@ -49,9 +49,12 @@ interface e0/1
 
 ip route 0.0.0.0 0.0.0.0 10.10.10.1
 
-access-list 1 permit 10.13.67.0 0.0.0.255
-access-list 1 permit 20.13.67.0 0.0.0.255
-ip nat inside source list 1 interface e0/2 overload
+access-list 101 deny ip 10.13.67.0 0.0.0.255 10.10.10.0 0.0.0.255
+access-list 101 deny ip 20.13.67.0 0.0.0.255 10.10.10.0 0.0.0.255
+access-list 101 permit ip 10.13.67.0 0.0.0.255 any
+access-list 101 permit ip 20.13.67.0 0.0.0.255 any
+
+ip nat inside source list 101 interface e0/2 overload
 
 ip dhcp excluded-address 10.13.67.1
 ip dhcp pool VLAN10-POOL
