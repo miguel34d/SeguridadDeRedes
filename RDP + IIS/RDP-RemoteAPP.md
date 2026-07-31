@@ -4,8 +4,11 @@
 ![Resultado](https://img.shields.io/badge/Resultado-RemoteApp%20Funcional-brightgreen)
 ![Dominio](https://img.shields.io/badge/Dominio-miguel.local-orange)
 ![HTTPS](https://img.shields.io/badge/RD%20Web%20Access-HTTPS%20Seguro-success)
+![Certificado](https://img.shields.io/badge/Certificado-Miguel.localssl-blueviolet)
 
 > ℹ️ Requisito previo: el dominio `miguel.local` ya debe estar creado, con `WindowsServer2022-1` como DC y `Windows10-1` unido al dominio (ver documento **Creación del Dominio**).
+
+> 🔑 **Nota importante:** este lab usa un único certificado llamado **`Miguel.localssl`**, creado por PowerShell con el Key Usage correcto (`DigitalSignature,KeyEncipherment`). Este mismo certificado se reutiliza sin cambios en los documentos **RD RemoteApp Web Client** e **IIS**, así que solo se crea **una vez, aquí**.
 
 ---
 
@@ -14,7 +17,9 @@
 - [ ] Rol RDS instalado
 - [ ] Colección de sesión creada
 - [ ] Apps publicadas (Notepad, Calc, Word)
-- [ ] Certificado SSL emitido y asignado
+- [ ] Certificado `Miguel.localssl` creado por PowerShell
+- [ ] Certificado asignado a los roles RDS (Agente de conexión x2 + Acceso web)
+- [ ] Certificado confiado en Windows10-1
 - [ ] Registro DNS `miguel.local` apuntando al servidor RDS
 - [ ] Acceso probado desde `https://miguel.local/rdweb` sin advertencia
 
@@ -93,48 +98,74 @@ Al entrar por primera vez a **Servicios de Escritorio remoto → Vista general**
 
 ---
 
-## 🔒 4. Certificado SSL (para HTTPS sin advertencias)
+## 🔒 4. Certificado SSL único: `Miguel.localssl`
 
-### Crear el certificado desde la propia consola RDS
+Este es el **único punto del lab donde se crea el certificado**. En los otros documentos (Web Client / IIS) solo se **selecciona el mismo archivo**, nunca se vuelve a crear uno nuevo.
+
+### 4.1 Crear el certificado por PowerShell (Key Usage correcto)
+
+**En WindowsServer2022-1 → PowerShell como administrador:**
+
+```powershell
+New-SelfSignedCertificate -DnsName "miguel.local" -CertStoreLocation "Cert:\LocalMachine\My" -KeyUsage DigitalSignature,KeyEncipherment -FriendlyName "Miguel.localssl"
+```
+
+La salida debe mostrar un **Thumbprint** y `Subject: CN=miguel.local`. Anota el thumbprint, porque será el mismo certificado que vas a reutilizar en RD Gateway, Web Client e IIS.
+
+> ⚠️ Se usa PowerShell (no el asistente gráfico "Crear nuevo certificado..." de la consola RDS) porque ese asistente solo asigna el Key Usage `Key Encipherment`, y los navegadores modernos (Chrome/Edge) también exigen `Digital Signature`. Si lo creas por el asistente gráfico vas a terminar con `ERR_SSL_KEY_USAGE_INCOMPATIBLE` más adelante.
+
+### 4.2 Exportar el certificado con clave privada (.pfx)
+
+**Ejecutar (`Win + R`) → `mmc`**
+
+| Paso | Click |
+|---|---|
+| 1 | Archivo → **Agregar o quitar complementos...** → **Certificados** → **Agregar** |
+| 2 | ⭕ **Cuenta de equipo** → Siguiente → ⭕ **Equipo local** → Finalizar → Aceptar |
+| 3 | Expande **Certificados (Equipo local) → Personal → Certificados** |
+| 4 | Busca el certificado `CN=miguel.local` con nombre descriptivo **Miguel.localssl** |
+| 5 | Click derecho sobre él → **Todas las tareas → Exportar...** |
+| 6 | Siguiente → ⭕ **Sí, exportar la clave privada** → Siguiente |
+| 7 | ⭕ **Intercambio de información personal - PKCS #12 (.PFX)** → ✅ Incluir todos los certificados en la ruta de acceso → Siguiente |
+| 8 | ✅ Contraseña: `Segura2121...` → confirmar contraseña → Siguiente |
+| 9 | Nombre de archivo: `C:\Certificados\Miguel.localssl.pfx` → Siguiente → **Finalizar** |
+| 10 | Debe salir: **"La exportación se realizó correctamente"** → Aceptar |
+
+### 4.3 Asignar el certificado a los roles RDS
 
 **Información general → Tareas → Editar propiedades de la implementación → pestaña Certificados**
 
-En la tabla **"Administrar certificados"** verás 4 filas: 2x **Agente de conexión a Escritorio remoto**, **Acceso web a Escritorio remoto** y **Puerta de enlace de Escritorio remoto** (esta última en gris, no aplica porque no instalamos ese rol).
+En la tabla **"Administrar certificados"** verás 4 filas: 2x **Agente de conexión a Escritorio remoto**, **Acceso web a Escritorio remoto** y **Puerta de enlace de Escritorio remoto** (esta última en gris por ahora, no aplica todavía porque no instalamos ese rol en este documento).
 
 | Paso | Click |
 |---|---|
-| 1 | Selecciona la primera fila **Agente de conexión a Escritorio remoto** (la de "Publicar") |
-| 2 | Botón **Crear nuevo certificado...** |
-| 3 | Nombre del certificado: `miguel.local` |
-| 4 | ✅ **Permitir que el certificado se agregue al almacén de raíz de confianza en las computadoras cliente** |
-| 5 | Ubicación del archivo: `C:\Certificados\miguel-local.pfx` → Contraseña: `ExportPass123!` → Confirmar |
-| 6 | Aceptar → repite los pasos 1–5 seleccionando la segunda fila **Agente de conexión a Escritorio remoto** (la de "Autenticación de identidad web único") |
-| 7 | Repite otra vez seleccionando la fila **Acceso web a Escritorio remoto** |
-| 8 | Verifica que las 3 filas queden con **Nivel: Confiable** y **Estado: Listo** |
-| 9 | **Aplicar** → Aceptar |
+| 1 | Selecciona la primera fila **Agente de conexión a Escritorio remoto** (la de "Publicación") |
+| 2 | **Seleccionar certificado existente...** |
+| 3 | Ruta: `C:\Certificados\Miguel.localssl.pfx` → Contraseña: `Segura2121...` |
+| 4 | ✅ **Permitir agregar el certificado al almacén de certificados Entidades de certificación raíz de confianza en los equipos de destino** |
+| 5 | Aceptar → **Aplicar** |
+| 6 | Repite pasos 2–4 en la fila **Agente de conexión a Escritorio remoto** (la de "Autenticación de identidad web único") → **Aplicar** |
+| 7 | Repite pasos 2–4 en la fila **Acceso web a Escritorio remoto** → **Aplicar** |
+| 8 | Verifica que las 3 filas queden con **Estado: Correcto** |
 
-### Exportar el certificado (sin clave privada) para el cliente
+### 4.4 Exportar el certificado (sin clave privada) para el cliente
 
-**En WindowsServer2022-1 → Ejecutar (`Win + R`) → `mmc`**
+**En WindowsServer2022-1 → mmc → Certificados (Equipo local) → Personal → Certificados**
 
 | Paso | Click |
 |---|---|
-| 1 | Archivo → **Agregar o quitar complementos...** |
-| 2 | Selecciona **Certificados** → **Agregar** |
-| 3 | ⭕ **Cuenta de equipo** → Siguiente → ⭕ **Equipo local** → Finalizar → Aceptar |
-| 4 | Expande **Certificados (Equipo local) → Personal → Certificados** |
-| 5 | Click derecho en el certificado `miguel.local` → **Todas las tareas → Exportar...** |
-| 6 | Siguiente → ⭕ **No, no exportar la clave privada** → Siguiente |
-| 7 | ⭕ **X.509 codificado en Base64 (.CER)** → Siguiente |
-| 8 | Nombre de archivo: `C:\Certificados\miguel-local.cer` → Siguiente → **Finalizar** |
-| 9 | Copia `miguel-local.cer` a una carpeta compartida o USB para llevarlo a Windows10-1 |
+| 1 | Click derecho en `CN=miguel.local` (nombre descriptivo **Miguel.localssl**) → **Todas las tareas → Exportar...** |
+| 2 | Siguiente → ⭕ **No, no exportar la clave privada** → Siguiente |
+| 3 | ⭕ **X.509 codificado en Base64 (.CER)** → Siguiente |
+| 4 | Nombre de archivo: `C:\Certificados\Miguel.localssl.cer` → Siguiente → **Finalizar** |
+| 5 | Copia `Miguel.localssl.cer` a una carpeta compartida o USB para llevarlo a Windows10-1 |
 
 ### Crear la carpeta compartida en WindowsServer2022-1
 
 | Paso | Click |
 |---|---|
 | 1 | Explorador de archivos → crea una carpeta nueva, ej. `C:\Compartido` |
-| 2 | Copia dentro el archivo `miguel-local.cer` |
+| 2 | Copia dentro el archivo `Miguel.localssl.cer` |
 | 3 | Click derecho en `C:\Compartido` → **Propiedades** → pestaña **Compartir** → **Uso compartido avanzado...** |
 | 4 | ✅ **Compartir esta carpeta** → nombre del recurso: `Compartido` → **Permisos** |
 | 5 | Selecciona **Todos** → ✅ **Permitir: Lectura** → Aceptar |
@@ -145,24 +176,18 @@ En la tabla **"Administrar certificados"** verás 4 filas: 2x **Agente de conexi
 
 > ⚠️ Si al entrar desde Windows10-1 aparece **"Windows no puede obtener acceso a \\...\Compartido"**, casi siempre falta el permiso de **Seguridad (NTFS)** del paso 7–8 (el de "Compartir" no es suficiente por sí solo). Si persiste, borra credenciales guardadas en Windows10-1 desde **Panel de control → Cuentas de usuario → Administrador de credenciales** y vuelve a intentar escribiendo explícitamente `MIGUEL\ronaldrm`.
 
-### Copiar el certificado desde Windows10-1
+### 4.5 Confiar en el certificado desde Windows10-1
 
 | Paso | Click |
 |---|---|
 | 1 | Explorador de archivos → barra de direcciones → `\\WIN-3RVTQIDV70S\Compartido` → Enter |
 | 2 | Si pide credenciales: usuario `MIGUEL\ronaldrm` → contraseña `Segura2121...` |
-| 3 | Copia `miguel-local.cer` al **Escritorio** de Windows10-1 |
-
-### Confiar en el certificado desde Windows10-1
-
-| Paso | Click |
-|---|---|
-| 1 | Copia `miguel-local.cer` a Windows10-1 y haz doble click sobre él |
-| 2 | **Instalar certificado...** |
-| 3 | ⭕ **Equipo local** → Siguiente (aceptar el control de cuentas de usuario) |
-| 4 | ⭕ **Colocar todos los certificados en el siguiente almacén** → **Examinar...** |
-| 5 | Selecciona **Entidades de certificación raíz de confianza** → Aceptar |
-| 6 | Siguiente → **Finalizar** → Aceptar en el mensaje de importación correcta |
+| 3 | Copia `Miguel.localssl.cer` al **Escritorio** de Windows10-1 |
+| 4 | Doble click sobre el archivo → **Instalar certificado...** |
+| 5 | ⭕ **Equipo local** → Siguiente (aceptar el control de cuentas de usuario) |
+| 6 | ⭕ **Colocar todos los certificados en el siguiente almacén** → **Examinar...** |
+| 7 | Selecciona **Entidades de certificación raíz de confianza** → Aceptar |
+| 8 | Siguiente → **Finalizar** → Aceptar en el mensaje de importación correcta |
 
 > ⚠️ **Si aparece "El administrador del sistema bloqueó esta aplicación"**: es una GPO de AppLocker / Directivas de restricción de software del dominio bloqueando el asistente de certificados.
 >
@@ -174,6 +199,16 @@ En la tabla **"Administrar certificados"** verás 4 filas: 2x **Agente de conexi
 >   4. **Configuración del equipo → Directivas → Configuración de Windows → Configuración de seguridad → Directivas de restricción de software** (o **Directivas de control de aplicaciones → AppLocker**)
 >   5. Si hay una regla que bloquea ejecutables, cámbiala a **No configurada** o agrega una regla de excepción
 >   6. En Windows10-1: `gpupdate /force` y reinicia
+
+### 🆘 Opción de respaldo: ¿no tienes el certificado `Miguel.localssl` creado?
+
+Si por cualquier motivo no existe todavía (lo borraste, cambiaste de servidor, etc.), créalo de nuevo con el mismo comando y **el mismo FriendlyName**, para que todos los documentos sigan siendo válidos sin renombrar nada:
+
+```powershell
+New-SelfSignedCertificate -DnsName "miguel.local" -CertStoreLocation "Cert:\LocalMachine\My" -KeyUsage DigitalSignature,KeyEncipherment -FriendlyName "Miguel.localssl"
+```
+
+Luego repite los pasos 4.2 a 4.5 de esta misma sección (exportar `.pfx`, asignar a los roles, exportar `.cer`, confiar en Windows10-1).
 
 ---
 
@@ -200,7 +235,7 @@ En la tabla **"Administrar certificados"** verás 4 filas: 2x **Agente de conexi
 |---|---|
 | 1 | Conexiones → `WINSERVER2022-1` → **Sitios** → **Default Web Site** |
 | 2 | Panel derecho → **Enlaces...** |
-| 3 | Verifica que exista `https` puerto `443` con el certificado `miguel.local` asignado |
+| 3 | Verifica que exista `https` puerto `443` con el certificado `Miguel.localssl` asignado |
 | 4 | Selecciona el enlace `http` puerto `80` → **Quitar** → Sí |
 | 5 | Cerrar |
 
@@ -223,6 +258,8 @@ En la tabla **"Administrar certificados"** verás 4 filas: 2x **Agente de conexi
 - [x] Rol RDS instalado
 - [x] Colección de sesión creada
 - [x] Apps publicadas (Notepad, Calc, Word)
-- [x] Certificado SSL emitido y asignado
+- [x] Certificado `Miguel.localssl` creado por PowerShell
+- [x] Certificado asignado a los roles RDS (Agente de conexión x2 + Acceso web)
+- [x] Certificado confiado en Windows10-1
 - [x] Registro DNS `miguel.local` apuntando al servidor RDS
 - [x] Acceso probado desde `https://miguel.local/rdweb` sin advertencia
