@@ -120,20 +120,28 @@ Si por algún motivo no aparece ninguno, repite la exportación sin clave privad
 Con la consola abierta, pega este comando y presiona `Enter`:
 
 ```powershell
-Install-Module -Name RDWebClientManagement -Force
+# 1. Instalar/actualizar el proveedor NuGet
+Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
+
+# 2. Actualizar PowerShellGet
+Install-Module -Name PowerShellGet -Force -AllowClobber -Scope AllUsers
 ```
+Cierra la consola y abre una nueva 
 
-Si pregunta por confiar en el repositorio NuGet o PSGallery, responde:
-
-```powershell
-Y
-```
-
----
 
 ## 🔧 2. Instalar el paquete del RD Web Client
 
 ```powershell
+# 3. Confirmar versión nueva
+Get-Module PowerShellGet -ListAvailable
+
+# 4. Reinstalar el módulo RDS (con aceptación de licencia)
+Install-Module -Name RDWebClientManagement -Force -AcceptLicense
+
+# 5. Importarlo explícitamente
+Import-Module RDWebClientManagement
+
+# 6. Ahora sí
 Install-RDWebClientPackage
 ```
 
