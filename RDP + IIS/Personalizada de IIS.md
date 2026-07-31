@@ -4,6 +4,9 @@
 ![Resultado](https://img.shields.io/badge/Resultado-Sitio%20Web%20Funcional-brightgreen)
 ![Dominio](https://img.shields.io/badge/Dominio-miguel.local-orange)
 ![HTTPS](https://img.shields.io/badge/Acceso-HTTPS%20Seguro-success)
+![Certificado](https://img.shields.io/badge/Certificado-Miguel.localssl-blueviolet)
+
+> 🔑 **Nota importante:** este documento **no crea un certificado nuevo**. Se reutiliza el mismo `Miguel.localssl` creado en el documento **RDP-RemoteAPP.md**. Solo hace falta enlazarlo al sitio de IIS.
 
 ---
 
@@ -12,9 +15,9 @@
 - [ ] Rol **Servidor Web (IIS)** instalado
 - [ ] Carpeta del sitio creada con la página personalizada
 - [ ] Documento predeterminado configurado
-- [ ] Certificado `miguel.local` creado por PowerShell con Key Usage correcto
-- [ ] Sitio creado en IIS Manager con enlace HTTPS en el puerto 443
-- [ ] Certificado confiado en Windows10-1
+- [ ] Certificado `Miguel.localssl` ya creado (documento anterior) — reutilizado aquí
+- [ ] Sitio creado en IIS Manager con enlace HTTPS en el puerto 443 usando `Miguel.localssl`
+- [ ] Certificado confiado en Windows10-1 (ya lo estaba)
 - [ ] Regla de Firewall habilitada para HTTPS (puerto 443)
 - [ ] Acceso probado desde `https://miguel.local/` sin errores de certificado
 
@@ -78,15 +81,19 @@
 
 ---
 
-## 🔒 3. Crear el certificado por PowerShell (Key Usage correcto)
+## 🔒 3. Reutilizar el certificado `Miguel.localssl`
 
-**En WindowsServer2022-1 → PowerShell como administrador:**
+No hace falta crear un certificado nuevo para IIS. El mismo `Miguel.localssl` creado por PowerShell en el documento **RDP-RemoteAPP.md** ya está en el almacén `Cert:\LocalMachine\My` de `WindowsServer2022-1` con el Key Usage correcto (`DigitalSignature,KeyEncipherment`), así que aparecerá directamente en el desplegable de certificados al crear el sitio en IIS (paso 4.6 más abajo).
+
+### 🆘 Opción de respaldo: ¿no tienes el certificado `Miguel.localssl`?
+
+Si no hiciste los documentos anteriores o el certificado ya no existe, créalo con el mismo comando y el mismo nombre:
 
 ```powershell
-New-SelfSignedCertificate -DnsName "miguel.local" -CertStoreLocation "Cert:\LocalMachine\My" -KeyUsage DigitalSignature,KeyEncipherment -FriendlyName "miguel.local-iis"
+New-SelfSignedCertificate -DnsName "miguel.local" -CertStoreLocation "Cert:\LocalMachine\My" -KeyUsage DigitalSignature,KeyEncipherment -FriendlyName "Miguel.localssl"
 ```
 
-La salida debe mostrar un **Thumbprint** y `Subject: CN=miguel.local`. Anota o recuerda el thumbprint por si hay varios certificados parecidos más adelante.
+Con esto ya aparecerá disponible en el desplegable de IIS Manager en el paso 4.6. Recuerda repetir también los pasos de exportar y confiar en Windows10-1 (sección 7) si Windows10-1 tampoco lo tiene todavía.
 
 ---
 
@@ -101,7 +108,7 @@ La salida debe mostrar un **Thumbprint** y `Subject: CN=miguel.local`. Anota o r
 | 3 | Ruta de acceso física: `C:\inetpub\miguel-site` |
 | 4 | Tipo: **https** — Dirección IP: **Todas sin asignar** — Puerto: **443** |
 | 5 | Nombre de host: `miguel.local` |
-| 6 | Certificado SSL: selecciona **miguel.local-iis** (el certificado creado en el paso 3) del menú desplegable |
+| 6 | Certificado SSL: selecciona **Miguel.localssl** (el mismo certificado ya creado y usado en RDS/Gateway) del menú desplegable |
 | 7 | Aceptar |
 
 ---
@@ -129,7 +136,17 @@ New-NetFirewallRule -DisplayName "Permitir HTTPS (Puerto 443)" -Direction Inboun
 
 ---
 
-## 🔒 7. Confiar en el certificado desde Windows10-1
+## 🔒 7. Confirmar que Windows10-1 ya confía en el certificado
+
+Como el certificado es el mismo `Miguel.localssl` confiado en los documentos anteriores, **normalmente no hace falta volver a importarlo**. Solo verifica:
+
+| Paso | Click |
+|---|---|
+| 1 | En Windows10-1: `Win + R` → `certmgr.msc` |
+| 2 | Expande **Entidades de certificación raíz de confianza → Certificados** |
+| 3 | Confirma que aparece `miguel.local` en la lista |
+
+Si no aparece (por ejemplo, porque este es el primer documento que haces del lab), expórtalo sin clave privada y trúalo en Windows10-1:
 
 **En WindowsServer2022-1:**
 
@@ -138,11 +155,11 @@ New-NetFirewallRule -DisplayName "Permitir HTTPS (Puerto 443)" -Direction Inboun
 | 1 | `Win + R` → `mmc` → Archivo → **Agregar o quitar complementos...** → **Certificados** → **Agregar** |
 | 2 | ⭕ **Cuenta de equipo** → Siguiente → ⭕ **Equipo local** → Finalizar → Aceptar |
 | 3 | Expande **Certificados (Equipo local) → Personal → Certificados** |
-| 4 | Click derecho en `CN=miguel.local` (nombre descriptivo **miguel.local-iis**) → **Todas las tareas → Exportar...** |
+| 4 | Click derecho en `CN=miguel.local` (nombre descriptivo **Miguel.localssl**) → **Todas las tareas → Exportar...** |
 | 5 | Siguiente → ⭕ **No, no exportar la clave privada** → Siguiente |
 | 6 | ⭕ **X.509 codificado en Base64 (.CER)** → Siguiente |
-| 7 | Nombre de archivo: `C:\Certificados\miguel-local-iis.cer` → Siguiente → **Finalizar** |
-| 8 | Copia `miguel-local-iis.cer` a Windows10-1 (por la carpeta compartida `\\WIN-3RVTQIDV70S\Compartido`) |
+| 7 | Nombre de archivo: `C:\Certificados\Miguel.localssl.cer` → Siguiente → **Finalizar** |
+| 8 | Copia `Miguel.localssl.cer` a Windows10-1 (por la carpeta compartida `\\WIN-3RVTQIDV70S\Compartido`) |
 
 **En Windows10-1:**
 
@@ -170,18 +187,18 @@ New-NetFirewallRule -DisplayName "Permitir HTTPS (Puerto 443)" -Direction Inboun
 <details>
 <summary>Advertencia de certificado no confiable en el navegador</summary>
 
-**Causa:** el certificado no se importó en el almacén **Entidades de certificación raíz de confianza** de Windows10-1, o se importó con un thumbprint distinto al que quedó enlazado en IIS.
+**Causa:** el certificado no se importó en el almacén **Entidades de certificación raíz de confianza** de Windows10-1, o Windows10-1 tiene un `miguel.local` distinto (de un intento anterior) al que quedó enlazado en IIS.
 
-**Solución:** repite el paso 7 verificando que el `.cer` copiado corresponda al mismo certificado seleccionado en el enlace HTTPS del sitio (paso 4.6).
+**Solución:** repite la sección 7 verificando que el `.cer` copiado corresponda al mismo certificado **Miguel.localssl** seleccionado en el enlace HTTPS del sitio (paso 4.6). Si hay certificados `miguel.local` viejos en `certmgr.msc`, elimínalos para evitar confusión.
 
 </details>
 
 <details>
 <summary>ERR_SSL_KEY_USAGE_INCOMPATIBLE</summary>
 
-**Causa:** el certificado fue creado sin el key usage "Digital Signature" (por ejemplo, con un asistente gráfico que solo asigna "Key Encipherment"). Chrome/Edge actualizados lo rechazan.
+**Causa:** el certificado enlazado no tiene el Key Usage "Digital Signature" (por ejemplo, si se usó un asistente gráfico distinto en vez de reutilizar `Miguel.localssl`). Chrome/Edge actualizados lo rechazan.
 
-**Solución:** vuelve a crear el certificado con `New-SelfSignedCertificate` incluyendo `-KeyUsage DigitalSignature,KeyEncipherment` (paso 3) y reasígnalo al enlace HTTPS del sitio.
+**Solución:** verifica en `mmc → Certificados (Equipo local) → Personal` que el certificado enlazado en el sitio sea exactamente `Miguel.localssl` (creado con `-KeyUsage DigitalSignature,KeyEncipherment`). Si no lo es, sigue la opción de respaldo de la sección 3 para recrearlo con ese nombre y reasignarlo al enlace HTTPS del sitio.
 
 </details>
 
@@ -227,8 +244,8 @@ Get-ChildItem -Path Cert:\LocalMachine\My
 - [x] Rol **Servidor Web (IIS)** instalado
 - [x] Carpeta del sitio creada con la página personalizada
 - [x] Documento predeterminado configurado
-- [x] Certificado `miguel.local` creado por PowerShell con Key Usage correcto
-- [x] Sitio creado en IIS Manager con enlace HTTPS en el puerto 443
-- [x] Certificado confiado en Windows10-1
+- [x] Certificado `Miguel.localssl` ya creado (documento anterior) — reutilizado aquí
+- [x] Sitio creado en IIS Manager con enlace HTTPS en el puerto 443 usando `Miguel.localssl`
+- [x] Certificado confiado en Windows10-1 (ya lo estaba)
 - [x] Regla de Firewall habilitada para HTTPS (puerto 443)
 - [x] Acceso probado desde `https://miguel.local/` sin errores de certificado
