@@ -11,7 +11,7 @@
 
 ## Diagrama de topología
 
-![Topología VPN Client to Site](topologia-vpn-client-to-site.png)
+![Topología VPN Client to Site](<img width="1040" height="856" alt="image" src="https://github.com/user-attachments/assets/b17dc03a-9213-4281-83e6-86a9ce160a64" />)
 
 ## Topología y Direccionamiento
 
