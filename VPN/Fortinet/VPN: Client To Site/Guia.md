@@ -235,7 +235,7 @@ end
 
 **GUI: VPN > IPsec Tunnels > Client-To-Site > Edit**
 
-**XAUTH**: User Group = Inherit from policy
+**XAUTH**: edit > User Group = Inherit from policy
 
 **Authentication**
 
