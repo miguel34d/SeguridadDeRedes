@@ -192,6 +192,20 @@ end
 | Subnet Mask | 255.255.255.0 |
 | Enable IPv4 Split Tunnel | Desactivado |
 
+**Crear el objeto "LAN-INTERNA" (si aún no existe)**
+
+En el campo "Local Address", abrir el selector de "Select Entries" y hacer clic en **"+ Create" > "Address"**. Rellenar el formulario:
+
+| Campo | Valor |
+|---|---|
+| Name | LAN-INTERNA |
+| Interface | any (o port2) |
+| Type | Subnet |
+| IP/Netmask | 20.13.67.0/255.255.255.0 |
+| Static route configuration | Desactivado |
+
+Guardar con **OK** y luego seleccionar el objeto "LAN-INTERNA" en la lista para que quede asignado al campo "Local Address".
+
 **Paso 4 - Client Options**
 
 | Campo | Valor |
@@ -201,6 +215,8 @@ end
 | Always Up (Keep Alive) | Desactivado |
 
 **Paso 5**: Review Settings > Create
+
+> Nota: en la pantalla de Review Settings, el botón "Edit" de Authentication solo permite revisar la Pre-shared Key. Los campos IKE Version y Peer Options/Accept Types no están disponibles en el wizard; se configuran después, al editar el túnel ya creado (ver sección 6).
 
 **CLI**
 
