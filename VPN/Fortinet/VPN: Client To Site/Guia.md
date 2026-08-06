@@ -92,38 +92,32 @@ end
 
 ---
 
-## 3. FortiGate - Grupo de Usuarios VPN
-
-**GUI: User & Authentication > User Groups > Create New**
-
-| Campo | Valor |
-|---|---|
-| Name | VPN-USERS |
-| Type | Firewall |
-| Members | vpnuser1 |
-
-**CLI**
-
-```
-config user group
-    edit "VPN-USERS"
-        set member "vpnuser1"
-    next
-end
-```
-
----
-
-## 4. FortiGate - Crear Usuario VPN
+## 3. FortiGate - Crear Usuarios VPN
 
 **GUI: User & Authentication > User Definition > Create New**
+
+**Usuario 1**
 
 1. Local User > Next
 2. Login Credentials:
 
 | Campo | Valor |
 |---|---|
-| Username | vpnuser1 |
+| Username | uservpn1 |
+| Password | Vpnuser123! |
+
+3. Contact Info: Next
+4. Extra Info: User Account Status = Enabled
+5. Submit
+
+**Usuario 2**
+
+1. Local User > Next
+2. Login Credentials:
+
+| Campo | Valor |
+|---|---|
+| Username | uservpn2 |
 | Password | Vpnuser123! |
 
 3. Contact Info: Next
@@ -134,9 +128,35 @@ end
 
 ```
 config user local
-    edit "vpnuser1"
+    edit "uservpn1"
         set type password
         set passwd Vpnuser123!
+    next
+    edit "uservpn2"
+        set type password
+        set passwd Vpnuser123!
+    next
+end
+```
+
+---
+
+## 4. FortiGate - Grupo de Usuarios VPN
+
+**GUI: User & Authentication > User Groups > Create New**
+
+| Campo | Valor |
+|---|---|
+| Name | VPN-USERS |
+| Type | Firewall |
+| Members | uservpn1, uservpn2 |
+
+**CLI**
+
+```
+config user group
+    edit "VPN-USERS"
+        set member "uservpn1" "uservpn2"
     next
 end
 ```
