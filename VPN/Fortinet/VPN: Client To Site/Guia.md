@@ -235,7 +235,7 @@ end
 
 **GUI: VPN > IPsec Tunnels > Client-To-Site > Edit**
 
-**XAUTH**: edit > User Group = Inherit from policy
+**XAUTH**: User Group = Inherit from policy
 
 **Authentication**
 
@@ -301,7 +301,24 @@ end
 
 ---
 
+## Nota general para las políticas 7-10 (formulario GUI)
+
+Al crear cada política en **Policy & Objects > Firewall Policy > Create New**, además de los campos de la tabla, el formulario muestra estas secciones adicionales — dejarlas así salvo que se indique lo contrario:
+
+| Sección | Campo | Valor |
+|---|---|---|
+| Firewall/Network Options | NAT | Según tabla de cada política (Activado solo en LAN-to-WAN) |
+| Firewall/Network Options | IP pool configuration | Use Outgoing Interface Address (solo aplica si NAT está activado) |
+| Firewall/Network Options | Manage source port | Preserve source port |
+| Firewall/Network Options | Protocol options | default |
+| Security Profiles | AntiVirus, Web filter, DNS filter, Application control, IPS, File filter | Desactivados |
+| Security Profiles | SSL inspection | no-inspection |
+
+---
+
 ## 7. FortiGate - Política: Túnel -> LAN
+
+> El wizard crea esta política automáticamente. Editarla (Policy & Objects > Firewall Policy > vpn_Client-To-Site_remote_0 > Edit) y dejarla así:
 
 **GUI: Policy & Objects > Firewall Policy > Create New**
 
@@ -309,9 +326,9 @@ end
 |---|---|
 | Name | vpn_Client-To-Site_remote_0 |
 | Incoming Interface | Client-To-Site (tunnel) |
-| Outgoing Interface | port2 |
-| Source | all |
-| Destination | all |
+| Outgoing Interface | LAN-INTERNA (port2) |
+| Source | Client-To-Site_range |
+| Destination | LAN-INTERNA |
 | Schedule | always |
 | Service | ALL |
 | Action | ACCEPT |
