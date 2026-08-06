@@ -49,6 +49,37 @@
 | Addressing mode | Manual |
 | IP/Netmask | 20.13.67.1/255.255.255.0 |
 | Access | PING, HTTPS, HTTP |
+| DHCP Server | Activado |
+
+Al activar **DHCP Server** en port2, se despliegan estos campos (dejarlos así):
+
+| Campo | Valor |
+|---|---|
+| Address Range | 20.13.67.20-20.13.67.254 |
+| Netmask | 255.255.255.0 |
+| Default Gateway | Same as Interface IP (20.13.67.1) |
+| DNS Server | Same as System DNS |
+
+Con esto, PC1 (VPCS) recibe IP automática dentro del rango 20.13.67.20-20.13.67.254 al hacer `ip dhcp` en la consola de VPCS. Windows10-2 sigue con IP estática (20.13.67.10), fuera del rango DHCP para evitar conflicto.
+
+**CLI**
+
+```
+config system dhcp server
+    edit 1
+        set interface "port2"
+        set default-gateway 20.13.67.1
+        set netmask 255.255.255.0
+        set dns-service default
+        config ip-range
+            edit 1
+                set start-ip 20.13.67.20
+                set end-ip 20.13.67.254
+            next
+        end
+    next
+end
+```
 
 **CLI**
 
