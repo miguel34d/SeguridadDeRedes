@@ -303,6 +303,8 @@ end
 
 ## Nota general para las políticas 7-10 (formulario GUI)
 
+> Si tienes licencia de evaluación, solo permite crear 3 políticas. Priorizar: 7 (vpn_Client-To-Site_remote_0, la crea el wizard), 8 (LAN-TO-VPN) y 9 (LAN-to-WAN). La política 10 (VPN-TO-VPN) se puede omitir.
+
 Al crear cada política en **Policy & Objects > Firewall Policy > Create New**, además de los campos de la tabla, el formulario muestra estas secciones adicionales — dejarlas así salvo que se indique lo contrario:
 
 | Sección | Campo | Valor |
@@ -668,7 +670,10 @@ interface Ethernet0/1
 exit
 !
 interface Ethernet0/2
- shutdown
+ description hacia-PC1-VPCS
+ switchport mode access
+ switchport access vlan 20
+ no shutdown
 exit
 !
 interface Ethernet0/3
