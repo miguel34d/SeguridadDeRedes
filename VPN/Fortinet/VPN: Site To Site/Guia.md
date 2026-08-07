@@ -66,6 +66,8 @@ Al activar **DHCP Server** en port2, se despliegan estos campos (dejarlos así):
 | Default Gateway | Same as Interface IP (10.13.67.1) |
 | DNS Server | Same as System DNS |
 
+> ⚠️ **Ver Apéndice A** antes de dar por buena esta sección: si el DHCP server queda con `vci-match enable`, los clientes normales (VPCS, PCs) no reciben IP aunque el servidor esté corriendo.
+
 **CLI**
 
 ```
@@ -165,6 +167,8 @@ El wizard genera automáticamente:
 | Blackhole route | #3 |
 | Local to remote policy | vpn_Site-To-Site_local_0 |
 | Remote to local policy | vpn_Site-To-Site_remote_0 |
+
+> ⚠️ **Ver Apéndice B** antes de continuar: si el pre-shared key no coincide carácter por carácter entre FortiGate1 y FortiGate2, la Fase 1 sube hasta el paso AUTH y falla ahí (`PSK auth failed: probable pre-shared key mismatch`), aunque la conectividad IP entre las WAN esté perfecta.
 
 **CLI**
 
@@ -334,6 +338,8 @@ Al activar **DHCP Server** en port2, se despliegan estos campos (dejarlos así):
 | Default Gateway | Same as Interface IP (20.13.67.1) |
 | DNS Server | Same as System DNS |
 
+> ⚠️ **Ver Apéndice A**: mismo riesgo de `vci-match` que en FortiGate1 — verifícalo también aquí con `show system dhcp server`.
+
 **CLI**
 
 ```
@@ -370,6 +376,14 @@ end
 
 ## 8. FortiGate2 - Ruta Estática por Defecto
 
+**GUI: Network > Static Routes > Create New**
+
+| Campo | Valor |
+|---|---|
+| Destination | 0.0.0.0/0.0.0.0 |
+| Interface | port1 |
+| Gateway | 200.13.67.5 |
+
 **CLI**
 
 ```
@@ -385,22 +399,37 @@ end
 
 ## 9. FortiGate2 - VPN IPsec Site-to-Site (Wizard)
 
-**GUI: VPN > IPsec Wizard > Create New** (configuración espejo de FortiGate1)
+**GUI: VPN > IPsec Wizard > Create New**
 
 | Campo | Valor |
 |---|---|
 | Name | Site-To-Site |
 | Template type | Site to Site |
 | Remote device type | FortiGate |
+
+**Paso 2 - Authentication**
+
+| Campo | Valor |
+|---|---|
 | Remote IP address | 200.13.67.2 (WAN de FortiGate1) |
 | Outgoing Interface | port1 |
+| Authentication Method | Pre-shared Key |
 | Pre-shared key | Fortinet123! |
 | Version | 2 |
+
+**Paso 3 - Policy & Routing**
+
+| Campo | Valor |
+|---|---|
 | Local Interface | port2 |
 | Local Subnets | 20.13.67.0/24 |
 | Remote Subnets | 10.13.67.0/24 |
 
-El wizard genera automáticamente los mismos objetos que en FortiGate1 (address groups, static route, blackhole route y políticas `vpn_Site-To-Site_local_0` / `vpn_Site-To-Site_remote_0`).
+**Paso 4**: Review Settings > Create
+
+El wizard genera automáticamente los mismos objetos que en FortiGate1 (ver tabla en sección 3): Phase 1 interface, address groups, Phase 2 interface, static route, blackhole route y políticas `vpn_Site-To-Site_local_0` / `vpn_Site-To-Site_remote_0`.
+
+> ⚠️ **El pre-shared key debe ser IDÉNTICO, carácter por carácter, al que pusiste en FortiGate1 (sección 3).** Este fue el punto de falla real en esta configuración — ver Apéndice B para el procedimiento de verificación y el error exacto que produce en los logs de debug.
 
 **CLI**
 
@@ -429,13 +458,20 @@ config vpn ipsec phase2-interface
 end
 ```
 
-Fase 1 y Fase 2 se ajustan igual que en la sección 4 (DES-SHA256, DH 14, PFS activado, lifetimes 86400/43200).
+Fase 1 y Fase 2 se ajustan igual que en la sección 4 (mismos campos: DES-SHA256, DH 14, PFS activado, lifetimes 86400/43200), reemplazando las direcciones locales/remotas por las de este sitio.
 
 ---
 
 ## 10. FortiGate2 - Ruta hacia la LAN remota vía túnel
 
 Creada automáticamente por el wizard, junto con una ruta **Blackhole** hacia la misma subred remota.
+
+**GUI: Network > Static Routes**
+
+| Campo | Valor |
+|---|---|
+| Destination | 10.13.67.0/255.255.255.0 |
+| Interface | Site-To-Site (tunnel) |
 
 **CLI**
 
@@ -459,6 +495,11 @@ end
 ## 11. FortiGate2 - Políticas de Firewall
 
 Creadas automáticamente por el wizard.
+
+| Nombre | Incoming | Outgoing |
+|---|---|---|
+| vpn_Site-To-Site_local_0 | port2 | Site-To-Site (tunnel) |
+| vpn_Site-To-Site_remote_0 | Site-To-Site (tunnel) | port2 |
 
 **CLI**
 
@@ -630,6 +671,8 @@ ip dhcp
 ```
 
 > Cada VPCS recibirá una IP dentro del rango DHCP configurado en el port2 del FortiGate correspondiente (10.13.67.10-254 o 20.13.67.10-254). Confirmar con `show ip` en la consola de VPCS antes de hacer las pruebas de conectividad, ya que la IP asignada puede no ser exactamente `.10` si hay más de un cliente en la red.
+>
+> ⚠️ Si aparece el error `Can't find dhcp server`, ver **Apéndice A** — no es un problema de switch ni de VLAN en la mayoría de los casos.
 
 ---
 
@@ -681,3 +724,138 @@ Puedes confirmar si tu VM está en este modo corriendo `get system status`: si v
 **Con licencia de evaluación:** después de correr el IPsec Wizard, elimina la ruta con Interface = Blackhole (Network > Static Routes) para no exceder el límite de 3 rutas. La ruta hacia la subred remota vía el túnel es la que realmente importa; la blackhole es un respaldo opcional.
 
 **Con licencia registrada / más amplia:** no es necesario eliminar nada. Si necesitas rutas adicionales (otro sitio, otra subred), créalas normalmente desde **Network > Static Routes > Create New**, sin restricción de cantidad.
+
+---
+
+## Apéndice A — DHCP no entrega IP (`Can't find dhcp server`)
+
+Síntoma en el VPCS:
+
+```
+PC1> ip dhcp
+DDD
+Can't find dhcp server
+```
+
+**Causa real (confirmada en este lab):** el DHCP server del FortiGate puede quedar con el filtro de Vendor Class Identifier activado, por ejemplo:
+
+```
+show system dhcp server
+config system dhcp server
+    edit 1
+        ...
+        set vci-match enable
+        set vci-string "FortiSwitch" "FortiExtender"
+    next
+end
+```
+
+Con `vci-match enable`, el servidor **solo responde** a clientes cuyo VCI sea FortiSwitch o FortiExtender (se usa normalmente para aprovisionamiento automático de equipos Fortinet). Un VPCS o PC normal no tiene ese VCI, así que el servidor ignora su solicitud aunque esté "corriendo" — por eso el DHCP parece activo en la GUI pero nunca asigna nada.
+
+**Diagnóstico**
+
+```
+show system dhcp server
+```
+
+Si aparece `set vci-match enable`, esa es la causa.
+
+**Solución**
+
+```
+config system dhcp server
+    edit 1
+        set vci-match disable
+    next
+end
+```
+
+O por GUI: **Network > Interfaces > port2 > DHCP Server**, en la configuración avanzada, desmarcar el filtro por VCI.
+
+Aplica el mismo chequeo en **ambos** FortiGate — es un valor por interfaz, no algo que se hereda de una configuración a otra.
+
+Verifica después con:
+```
+PC1> ip dhcp
+PC1> show ip
+```
+
+---
+
+## Apéndice B — Túnel sube pero falla la autenticación (`PSK auth failed`)
+
+Síntoma: `diagnose vpn tunnel list` muestra `status=down`, y `Monitor > IPsec Monitor` no sube el túnel aunque las WAN se hagan ping perfectamente entre sí.
+
+**Diagnóstico paso a paso**
+
+1. Confirmar conectividad IP básica entre las dos WAN:
+```
+execute ping 200.13.67.6    (desde FortiGate1)
+execute ping 200.13.67.2    (desde FortiGate2)
+```
+Si esto falla, el problema es de ruteo/ISP, no de IPsec — resolver eso primero.
+
+2. Si las WAN se ven bien, activar debug de IKE en uno de los dos FortiGate:
+```
+diagnose debug reset
+diagnose debug application ike -1
+diagnose debug enable
+```
+
+3. Forzar la negociación:
+```
+diagnose vpn tunnel up Site-To-Site
+```
+
+4. Revisar el log. La línea que confirma la causa exacta es:
+```
+PSK auth failed: probable pre-shared key mismatch
+```
+Esto significa que la Fase 1 sí completó el intercambio SA_INIT y llegó hasta el mensaje AUTH (o sea: la conectividad, el proposal de cifrado — DES-SHA256/DH14 — y el remote-gw están bien), pero el **pre-shared key no coincide** entre los dos FortiGate.
+
+**Solución**
+
+Reescribir el PSK en ambos lados, sin asumir que "ya estaba bien":
+
+```
+config vpn ipsec phase1-interface
+    edit "Site-To-Site"
+        set psksecret Fortinet123!
+    next
+end
+```
+(igual en FortiGate1 y FortiGate2 — el valor debe ser idéntico carácter por carácter)
+
+**Causas típicas del mismatch**
+
+- Espacio en blanco al inicio/final al pegar el PSK en uno de los dos lados.
+- El símbolo `!` se pierde o se duplica al copiar/pegar en la consola de GNS3.
+- Diferencia de mayúsculas/minúsculas (el PSK es case-sensitive).
+- Se configuró por GUI en un FortiGate y por CLI en el otro, y quedó una diferencia sin notar.
+
+**Recomendación:** escribe el PSK directamente en la consola en ambos lados en vez de pegarlo desde el portapapeles — evita el problema de caracteres que se pierden al pegar en GNS3.
+
+**Verificación final**
+
+```
+diagnose vpn tunnel up Site-To-Site
+diagnose vpn tunnel list
+```
+Debe mostrar `status=up`. Luego, para confirmar tráfico real cruzando (no solo el túnel negociado), usar el sniffer mientras se hace ping desde un VPCS:
+
+```
+diagnose sniffer packet any 'icmp' 4
+```
+
+Un ping exitoso a través del túnel se ve así en el sniffer del FortiGate que recibe la solicitud:
+
+```
+port2      in  20.13.67.10 -> 10.13.67.10: icmp: echo request
+Site-To-Site out 20.13.67.10 -> 10.13.67.10: icmp: echo request
+Site-To-Site in  10.13.67.10 -> 20.13.67.10: icmp: echo reply
+port2      out 10.13.67.10 -> 20.13.67.10: icmp: echo reply
+```
+
+Entra por la LAN (port2), sale por el túnel, vuelve la respuesta por el túnel, y sale de nuevo por la LAN — confirma el túnel funcionando de punta a punta.
+
+> Nota: probar con `execute ping` directamente desde el FortiGate hacia la LAN remota puede dar falsos negativos (100% packet loss) incluso con el túnel ya "up", porque el tráfico originado en el propio FortiGate no siempre atraviesa las mismas políticas que el tráfico real de la LAN. La prueba definitiva es siempre desde un host detrás de la LAN (VPCS o PC), no desde la CLI del FortiGate.
