@@ -30,6 +30,8 @@
 
 > Cambio respecto al lab Client-to-Site: ya no hay un pool de clientes remotos ni Router-ISP haciendo de gateway de LAN. Ahora cada FortiGate es el gateway de su propia LAN, y el túnel IPsec conecta directamente las dos redes 10.13.67.0/24 y 20.13.67.0/24 a través del ISP.
 
+> ⚠️ **Nota sobre licencia de evaluación (permanent-trial):** si tu FortiGate-VM corre con la licencia de evaluación gratuita (verificable con `get system status` — típicamente muestra `1 CPU/1 allowed` y `~2GB RAM/2048 MB allowed`), Fortinet limita esa licencia a un **máximo de 3 interfaces, 3 políticas de firewall y 3 rutas estáticas**. El IPsec Wizard crea automáticamente 3 rutas (default + ruta hacia la LAN remota + blackhole), lo que satura el límite y produce el error `Maximum number of entries has been reached. Object set operator error, -4 discard the setting.` al intentar guardar. Ver detalle y solución en las secciones 5 y 10.
+
 ---
 
 ## 1. FortiGate1 - Interfaces
@@ -228,7 +230,7 @@ end
 
 ## 5. FortiGate1 - Ruta hacia la LAN remota vía túnel
 
-Creada automáticamente por el wizard (Static Route #2).
+Creada automáticamente por el wizard (Static Route #2), junto con una ruta **Blackhole** (#3) hacia la misma subred remota como respaldo de seguridad (evita que el tráfico se filtre por la ruta por defecto si el túnel cae).
 
 **GUI: Network > Static Routes**
 
@@ -247,6 +249,16 @@ config router static
     next
 end
 ```
+
+> **Si tienes licencia de evaluación (permanent-trial, límite de 3 rutas):**
+> El wizard crea 3 rutas de golpe (default + Site-To-Site_remote + Blackhole) y satura el límite, dando el error `Maximum number of entries has been reached`. Solución:
+> 1. Ve a **Network > Static Routes**.
+> 2. Selecciona la fila con Interface = **Blackhole** (Comments: "VPN: Site-To-Site (Created by VPN wizard)").
+> 3. Click **Delete**.
+> 4. Confirma que te quedan solo 2 rutas: la default (0.0.0.0/0 por port1) y la de Site-To-Site_remote por la interfaz del túnel. Esto deja espacio dentro del límite de 3 y el túnel sigue funcionando igual, ya que la ruta hacia el túnel es la que realmente enruta el tráfico — la blackhole es solo un respaldo, no es indispensable.
+>
+> **Si tienes una licencia más amplia (registrada / sin el límite de 3 rutas):**
+> No hace falta eliminar nada. Deja la ruta Blackhole tal cual la creó el wizard, y si necesitas una ruta adicional (por ejemplo, hacia otra subred o un tercer sitio), simplemente ve a **Network > Static Routes > Create New** y complétala con los mismos criterios (Destination = subred remota, Interface = la del túnel correspondiente).
 
 ---
 
@@ -423,7 +435,7 @@ Fase 1 y Fase 2 se ajustan igual que en la sección 4 (DES-SHA256, DH 14, PFS ac
 
 ## 10. FortiGate2 - Ruta hacia la LAN remota vía túnel
 
-Creada automáticamente por el wizard.
+Creada automáticamente por el wizard, junto con una ruta **Blackhole** hacia la misma subred remota.
 
 **CLI**
 
@@ -435,6 +447,12 @@ config router static
     next
 end
 ```
+
+> **Si tienes licencia de evaluación (permanent-trial, límite de 3 rutas):**
+> Aplica el mismo criterio que en la sección 5: ve a **Network > Static Routes**, elimina la fila con Interface = **Blackhole**, y deja solo la ruta por defecto (0.0.0.0/0 por port1) y la ruta hacia 10.13.67.0/24 por la interfaz Site-To-Site. Con eso quedas dentro del límite de 3 rutas.
+>
+> **Si tienes una licencia más amplia:**
+> Deja la ruta Blackhole como la generó el wizard, y agrega rutas adicionales desde **Network > Static Routes > Create New** si tu topología lo requiere (por ejemplo, para un tercer sitio o una subred adicional detrás de FortiGate2).
 
 ---
 
@@ -646,3 +664,20 @@ También verificar con `ping` simple antes del traceroute:
 ```
 ping 20.13.67.10
 ```
+
+---
+
+## 17. Nota - Límite de rutas en licencia de evaluación FortiGate-VM
+
+Si tu FortiGate-VM corre en modo **permanent-trial** (licencia de evaluación gratuita, no registrada con FortiCare), Fortinet impone estos límites permanentes:
+
+- Máximo de **3 interfaces**, **3 políticas de firewall** y **3 rutas estáticas**.
+- Solo cifrado de baja intensidad.
+- Máximo 1 CPU y 2 GiB de RAM.
+- Sin soporte FortiCare.
+
+Puedes confirmar si tu VM está en este modo corriendo `get system status`: si ves algo como `VM Resources: 1 CPU/1 allowed, ~2007 MB RAM/2048 MB allowed`, es señal de licencia de evaluación.
+
+**Con licencia de evaluación:** después de correr el IPsec Wizard, elimina la ruta con Interface = Blackhole (Network > Static Routes) para no exceder el límite de 3 rutas. La ruta hacia la subred remota vía el túnel es la que realmente importa; la blackhole es un respaldo opcional.
+
+**Con licencia registrada / más amplia:** no es necesario eliminar nada. Si necesitas rutas adicionales (otro sitio, otra subred), créalas normalmente desde **Network > Static Routes > Create New**, sin restricción de cantidad.
