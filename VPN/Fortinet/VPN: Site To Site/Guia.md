@@ -135,10 +135,11 @@ end
 
 | Campo | Valor |
 |---|---|
-| IP Address | 200.13.67.6 (WAN de FortiGate2) |
+| Remote IP address | 200.13.67.6 (WAN de FortiGate2) |
 | Outgoing Interface | port1 |
 | Authentication Method | Pre-shared Key |
 | Pre-shared key | Fortinet123! |
+| Version | 2 |
 
 **Paso 3 - Policy & Routing**
 
@@ -150,7 +151,18 @@ end
 
 **Paso 4**: Review Settings > Create
 
-> El wizard en modo "Site to Site" crea automáticamente las políticas de firewall en ambos sentidos (túnel-LAN y LAN-túnel) y, si está habilitado, la ruta estática hacia la subred remota vía la interfaz del túnel. Verificar ambas cosas manualmente en las secciones 5 y 7.
+El wizard genera automáticamente:
+
+| Objeto | Nombre |
+|---|---|
+| Phase 1 interface | Site-To-Site |
+| Local address group | Site-To-Site_local |
+| Remote address group | Site-To-Site_remote |
+| Phase 2 interface | Site-To-Site |
+| Static route | #2 |
+| Blackhole route | #3 |
+| Local to remote policy | vpn_Site-To-Site_local_0 |
+| Remote to local policy | vpn_Site-To-Site_remote_0 |
 
 **CLI**
 
@@ -191,28 +203,34 @@ end
 |---|---|
 | Encryption | DES |
 | Authentication | SHA256 |
-| Diffie-Hellman Groups | 14 |
+| Diffie-Hellman Group | 14 |
 | Key Lifetime (seconds) | 86400 |
 
 **Phase 2 Selectors**
 
 | Campo | Valor |
 |---|---|
-| Local Address | 10.13.67.0/24 |
-| Remote Address | 20.13.67.0/24 |
+| Local Address | Site-To-Site_local (10.13.67.0/24) |
+| Remote Address | Site-To-Site_remote (20.13.67.0/24) |
+
+**Phase 2 Proposal (Advanced)**
+
+| Campo | Valor |
+|---|---|
 | Encryption | DES |
 | Authentication | SHA256 |
-| Diffie-Hellman Group | 14 |
+| Enable Replay Detection | Activado |
 | Enable PFS | Activado |
+| Diffie-Hellman Group | 14 |
 | Key Lifetime | 43200 segundos |
 
 ---
 
 ## 5. FortiGate1 - Ruta hacia la LAN remota vía túnel
 
-> Punto crítico: sin esta ruta, el tráfico hacia 20.13.67.0/24 sigue la ruta por defecto (sección 2) y sale por port1 hacia el ISP sin cifrar, en lugar de entrar al túnel. El wizard a veces la crea solo; confirmar siempre.
+Creada automáticamente por el wizard (Static Route #2).
 
-**GUI: Network > Static Routes > Create New**
+**GUI: Network > Static Routes**
 
 | Campo | Valor |
 |---|---|
@@ -234,57 +252,34 @@ end
 
 ## 6. FortiGate1 - Políticas de Firewall
 
-**GUI: Policy & Objects > Firewall Policy > Create New**
+Creadas automáticamente por el wizard.
 
-**Política LAN -> Túnel**
-
-| Campo | Valor |
-|---|---|
-| Name | LAN-TO-VPN |
-| Incoming Interface | port2 |
-| Outgoing Interface | Site-To-Site (tunnel) |
-| Source | all |
-| Destination | all |
-| Schedule | always |
-| Service | ALL |
-| Action | ACCEPT |
-| NAT | Desactivado |
-
-**Política Túnel -> LAN**
-
-| Campo | Valor |
-|---|---|
-| Name | VPN-TO-LAN |
-| Incoming Interface | Site-To-Site (tunnel) |
-| Outgoing Interface | port2 |
-| Source | all |
-| Destination | all |
-| Schedule | always |
-| Service | ALL |
-| Action | ACCEPT |
-| NAT | Desactivado |
+| Nombre | Incoming | Outgoing |
+|---|---|---|
+| vpn_Site-To-Site_local_0 | port2 | Site-To-Site (tunnel) |
+| vpn_Site-To-Site_remote_0 | Site-To-Site (tunnel) | port2 |
 
 **CLI**
 
 ```
 config firewall policy
     edit 1
-        set name "LAN-TO-VPN"
+        set name "vpn_Site-To-Site_local_0"
         set srcintf "port2"
         set dstintf "Site-To-Site"
-        set srcaddr "all"
-        set dstaddr "all"
+        set srcaddr "Site-To-Site_local"
+        set dstaddr "Site-To-Site_remote"
         set action accept
         set schedule "always"
         set service "ALL"
         set nat disable
     next
     edit 2
-        set name "VPN-TO-LAN"
+        set name "vpn_Site-To-Site_remote_0"
         set srcintf "Site-To-Site"
         set dstintf "port2"
-        set srcaddr "all"
-        set dstaddr "all"
+        set srcaddr "Site-To-Site_remote"
+        set dstaddr "Site-To-Site_local"
         set action accept
         set schedule "always"
         set service "ALL"
@@ -385,12 +380,15 @@ end
 | Name | Site-To-Site |
 | Template type | Site to Site |
 | Remote device type | FortiGate |
-| IP Address | 200.13.67.2 (WAN de FortiGate1) |
+| Remote IP address | 200.13.67.2 (WAN de FortiGate1) |
 | Outgoing Interface | port1 |
 | Pre-shared key | Fortinet123! |
+| Version | 2 |
 | Local Interface | port2 |
 | Local Subnets | 20.13.67.0/24 |
 | Remote Subnets | 10.13.67.0/24 |
+
+El wizard genera automáticamente los mismos objetos que en FortiGate1 (address groups, static route, blackhole route y políticas `vpn_Site-To-Site_local_0` / `vpn_Site-To-Site_remote_0`).
 
 **CLI**
 
@@ -425,6 +423,8 @@ Fase 1 y Fase 2 se ajustan igual que en la sección 4 (DES-SHA256, DH 14, PFS ac
 
 ## 10. FortiGate2 - Ruta hacia la LAN remota vía túnel
 
+Creada automáticamente por el wizard.
+
 **CLI**
 
 ```
@@ -440,27 +440,29 @@ end
 
 ## 11. FortiGate2 - Políticas de Firewall
 
+Creadas automáticamente por el wizard.
+
 **CLI**
 
 ```
 config firewall policy
     edit 1
-        set name "LAN-TO-VPN"
+        set name "vpn_Site-To-Site_local_0"
         set srcintf "port2"
         set dstintf "Site-To-Site"
-        set srcaddr "all"
-        set dstaddr "all"
+        set srcaddr "Site-To-Site_local"
+        set dstaddr "Site-To-Site_remote"
         set action accept
         set schedule "always"
         set service "ALL"
         set nat disable
     next
     edit 2
-        set name "VPN-TO-LAN"
+        set name "vpn_Site-To-Site_remote_0"
         set srcintf "Site-To-Site"
         set dstintf "port2"
-        set srcaddr "all"
-        set dstaddr "all"
+        set srcaddr "Site-To-Site_remote"
+        set dstaddr "Site-To-Site_local"
         set action accept
         set schedule "always"
         set service "ALL"
