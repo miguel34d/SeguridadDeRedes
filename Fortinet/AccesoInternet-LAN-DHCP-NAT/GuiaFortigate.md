@@ -35,6 +35,7 @@ Internet — Router1 (e0/0) —— Port1 [FortiGate] Port2 —— Switch1 ——
 2. [DHCP en LAN de usuarios](#2-dhcp-en-lan-de-usuarios)
 3. [Ruta por defecto](#3-ruta-por-defecto)
 4. [NAT](#4-nat)
+5. [Verificar traducción de IPs (NAT) en los logs](#5-verificar-traducción-de-ips-nat-en-los-logs)
 
 ---
 
@@ -211,6 +212,36 @@ end
 
 ---
 
+## 5. Verificar traducción de IPs (NAT) en los logs
+
+Por defecto el log de tráfico local puede venir limitado y no mostrar las sesiones permitidas. Para ver la IP origen (LAN) y su traducción hacia la WAN en `Forward Traffic`, hay que habilitar el log completo primero.
+
+### 🖱️ GUI
+
+1. `Log & Report > Log Settings`
+2. En **Local traffic logging**, selecciona `All` (o si usas `Customize`, activa el toggle **"Log allowed traffic"**)
+3. Ve a `Log & Report > Forward Traffic`
+4. Cambia el rango de tiempo (arriba a la derecha) de `5 minutes` a `1 hour`
+5. Genera tráfico desde el cliente (ej. `ping 8.8.8.8` desde Windows10-1) y refresca
+6. Haz clic en la sesión y luego en `Details` para ver **Source IP** (IP real de la LAN) vs **NAT'd Source IP / SNAT IP** (IP traducida hacia la WAN)
+
+### ⌨️ CLI
+
+```bash
+config log setting
+    set local-traffic enable
+end
+```
+
+Ver sesiones NAT activas en tiempo real:
+
+```bash
+diagnose sys session filter src 10.13.67.0 255.255.255.0
+diagnose sys session list
+```
+
+---
+
 ## ✅ Verificación
 
 | Prueba | Comando / Acción | Resultado esperado |
@@ -219,4 +250,5 @@ end
 | Conectividad usuarios | `ping 8.8.8.8` / `ping google.com` | Respuesta exitosa |
 | Conectividad servidores | Desde WEB-1: `ping 8.8.8.8` | Respuesta exitosa |
 | NAT activo | `Log & Report > Forward Traffic` | Sesiones saliendo por `port1` |
+| Traducción de IP visible | `Forward Traffic > Details` de una sesión | Source IP (LAN) distinta a NAT'd Source IP (WAN) |
 | Ruta por defecto | `get router info routing-table all` | `0.0.0.0/0` vía `port1` |
