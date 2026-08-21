@@ -15,14 +15,13 @@ Repositorio con los laboratorios prácticos de la asignatura **Seguridad de Rede
 
 ### Stack Tecnológico
 
-![Skills](https://skillicons.dev/icons?i=kalilinux,linux,windows,bash)
-
-<img src="https://icons.fortinet.com/icons/FortiGuard.svg" width="48" height="48" alt="FortiGuard" />
+![Skills](https://skillicons.dev/icons?i=linux,windows,bash)
 
 ![GNS3](https://img.shields.io/badge/GNS3-1F5C99?style=for-the-badge)
 ![EVE--NG](https://img.shields.io/badge/EVE--NG-2E3440?style=for-the-badge)
 ![Cisco](https://img.shields.io/badge/Cisco-1BA0D7?style=for-the-badge&logo=cisco&logoColor=white)
 ![Fortinet](https://img.shields.io/badge/Fortinet-EE3124?style=for-the-badge&logo=fortinet&logoColor=white)
+![Kali Linux](https://img.shields.io/badge/Kali%20Linux-557C94?style=for-the-badge&logo=kalilinux&logoColor=white)
 ![RADIUS/NPS](https://img.shields.io/badge/RADIUS%2FNPS-6E4C1E?style=for-the-badge)
 ![VPN L2TP/IPsec](https://img.shields.io/badge/VPN%20L2TP%2FIPsec-004B87?style=for-the-badge)
 ![Zabbix](https://img.shields.io/badge/Zabbix-D71920?style=for-the-badge&logo=zabbix&logoColor=white)
