@@ -17,6 +17,8 @@ Repositorio con los laboratorios prácticos de la asignatura **Seguridad de Rede
 
 ![Skills](https://skillicons.dev/icons?i=kalilinux,linux,windows,bash)
 
+<img src="https://icons.fortinet.com/icons/FortiGuard.svg" width="48" height="48" alt="FortiGuard" />
+
 ![GNS3](https://img.shields.io/badge/GNS3-1F5C99?style=for-the-badge)
 ![EVE--NG](https://img.shields.io/badge/EVE--NG-2E3440?style=for-the-badge)
 ![Cisco](https://img.shields.io/badge/Cisco-1BA0D7?style=for-the-badge&logo=cisco&logoColor=white)
