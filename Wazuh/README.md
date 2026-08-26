@@ -37,6 +37,7 @@ Instalación completada, contraseña inicial del usuario `admin` generada por el
 ## 5. Conectividad validada desde ADMINISTRADOR
 
 ![Ping y TCP test](./evidencias/05_administrador_ping_tcptest_ok.png)
+<img width="1026" height="763" alt="image" src="https://github.com/user-attachments/assets/edab45f5-6cf2-407a-9952-b0291d86ee26" />
 
 Desde ADMINISTRADOR (10.13.67.2): `ping` exitoso y `Test-NetConnection -Port 443` con `TcpTestSucceeded: True`.
 
