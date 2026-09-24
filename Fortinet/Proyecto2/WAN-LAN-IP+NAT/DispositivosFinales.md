@@ -100,32 +100,39 @@ Configuración de VLANs y puertos para segmentar el tráfico de servidores.
 
 | Puerto | Modo | VLAN Asignada | Dispositivo Conectado |
 | :--- | :--- | :--- | :--- |
-| **e0/0** | Trunk | 10, 20 | FortiGate (Port3) |
+| **e0/0** | Trunk (802.1Q) | 10, 20 | FortiGate (Port3) |
 | **e0/1** | Access | 20 | BaseDeDatos (Ubuntu) |
 | **e0/2** | Access | 20 | ServidorWeb (Ubuntu) |
 
-**Configuración CLI (Sintaxis tipo Cisco/GNS3):**
+**️ NOTA IMPORTANTE:** En algunos switches es necesario configurar la encapsulación del trunk antes de establecer el modo trunk.
+
+**Configuración CLI Corregida (Sintaxis tipo Cisco/GNS3):**
 ```bash
 enable
 configure terminal
 hostname Switch-DMZ
 
+! Crear VLAN 20
 vlan 20
  name DMZ-SERVIDORES
  exit
 
+! Configurar puerto e0/0 como Trunk (CORREGIDO)
 interface e0/0
+ switchport trunk encapsulation dot1q
  switchport mode trunk
  switchport trunk allowed vlan 10,20
  no shutdown
  exit
 
+! Configurar puerto e0/1 para BaseDeDatos (VLAN 20)
 interface e0/1
  switchport mode access
  switchport access vlan 20
  no shutdown
  exit
 
+! Configurar puerto e0/2 para ServidorWeb (VLAN 20)
 interface e0/2
  switchport mode access
  switchport access vlan 20
@@ -158,7 +165,7 @@ show running-config
 
 ---
 
-## 📊 Tabla Resumen de Direccionamiento IP
+##  Tabla Resumen de Direccionamiento IP
 
 | Dispositivo | Interfaz | IP | Máscara | Gateway |
 | :--- | :--- | :--- | :--- | :--- |
@@ -177,7 +184,7 @@ show running-config
 
 <br>
 
-### 👨‍ Realizado por: **Miguel Ramirez Meli**
+### 👨‍💻 Realizado por: **Miguel Ramirez Meli**
 
 ![Author](https://img.shields.io/badge/Author-Miguel_Ramirez_Meli-orange?style=for-the-badge)
 ![Lab](https://img.shields.io/badge/Lab-FortiGate_VM64-purple?style=for-the-badge)
