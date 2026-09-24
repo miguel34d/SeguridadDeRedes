@@ -1,130 +1,217 @@
-# 🗄️ Configuración del Servidor de Base de Datos (MySQL)
+# ✅ Validación de Servicios: ServidorWeb y BaseDeDatos
 
-![MySQL](https://img.shields.io/badge/MySQL-8.0-blue?logo=mysql&style=for-the-badge)
-![Ubuntu](https://img.shields.io/badge/Ubuntu-22.04-orange?logo=ubuntu&style=for-the-badge)
-![Database](https://img.shields.io/badge/Database-Remote_Access-green?style=for-the-badge)
+![FortiGate](https://img.shields.io/badge/FortiGate-VM64-red?logo=fortinet&style=for-the-badge)
+![WebServer](https://img.shields.io/badge/WebServer-Apache_HTTPS-blue?style=for-the-badge)
+![MySQL](https://img.shields.io/badge/MySQL-Remote_Access-orange?style=for-the-badge)
 ![GitHub](https://img.shields.io/badge/GitHub-Repo-black?style=for-the-badge)
 
 ## 📋 Descripción
-Este documento detalla los pasos para instalar, configurar y habilitar el acceso remoto a un servidor de base de datos **MySQL 8.0** en un entorno Ubuntu. Se incluye la creación de la base de datos, usuarios, y la configuración de red para permitir conexiones desde otras VLANs a través del FortiGate.
+Este documento valida el correcto funcionamiento de los dos servidores configurados en la **VLAN 20 (DMZ)**:
+- **ServidorWeb** (`20.13.67.2`) - Apache con HTTPS (certificado autofirmado con SAN)
+- **BaseDeDatos** (`20.13.67.3`) - MySQL Server con acceso remoto habilitado
 
 ---
 
-## 1️⃣ Instalación y Configuración Inicial
+## 🌐 1. ServidorWeb - Apache HTTPS (Puerto 443)
 
-### Instalar MySQL Server
+### Configuración Realizada
+- Servidor Apache instalado y activo en Ubuntu
+- Certificado SSL autofirmado generado con OpenSSL **incluyendo la extensión SAN** (Subject Alternative Name)
+- Puerto 443 (HTTPS) habilitado y escuchando
+- Certificado instalado en el almacén **"Entidades de certificación raíz de confianza"** de Windows (Máquina Local)
+
+###  Generación del Certificado con SAN
+
+Para que los navegadores modernos reconozcan el certificado como válido (mostrando el candado de "Conexión segura"), es necesario incluir la extensión **Subject Alternative Name (SAN)** con la IP del servidor:
+
 ```bash
-sudo apt update
-sudo apt install mysql-server -y
+sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout /etc/ssl/private/apache-selfsigned.key \
+  -out /etc/ssl/certs/apache-selfsigned.crt \
+  -subj "/C=CO/ST=Bogota/L=Bogota/O=Lab/OU=IT/CN=20.13.67.2" \
+  -addext "subjectAltName = IP:20.13.67.2"
 ```
 
-### Iniciar y habilitar el servicio
+> ⚠️ **Nota técnica:** Los navegadores modernos (Chrome, Edge, Firefox) ya no confían únicamente en el campo "Nombre Común" (CN) del certificado. Exigen que la IP o dominio esté declarado explícitamente en la extensión `subjectAltName`. Sin esta extensión, el navegador muestra "No seguro" aunque el certificado esté instalado como confiable.
+
+### Reinicio de Apache
 ```bash
-sudo systemctl start mysql
-sudo systemctl enable mysql
+sudo systemctl restart apache2
 ```
 
----
+### 📥 Exportación e Instalación del Certificado en Windows
 
-## 2️⃣ Creación de Base de Datos y Usuario
+**1. Descargar el certificado desde Windows (PowerShell):**
+```powershell
+scp miguel@20.13.67.2:/etc/ssl/certs/apache-selfsigned.crt .\servidorweb.crt
+```
 
-### Ingresar a la consola de MySQL
+**2. Instalar el certificado en el almacén de Máquina Local:**
+- Doble clic en `servidorweb.crt`
+- Clic en **Instalar certificado...**
+- Seleccionar: **Máquina local** (requiere permisos de administrador)
+- Elegir: **Colocar todos los certificados en el siguiente almacén**
+- Clic en **Examinar...** y seleccionar: **Entidades de certificación raíz de confianza**
+- **Aceptar** → **Siguiente** → **Finalizar** → **Sí** a la advertencia de seguridad
+
+###  Evidencia de Funcionamiento
+
+#### Captura 1: Acceso HTTPS con "Conexión Segura"
+Acceso exitoso a `https://20.13.67.2` desde el navegador, mostrando el **candado cerrado** y la página web personalizada del ServidorWeb en la VLAN 20 DMZ.
+
+![Acceso HTTPS ServidorWeb con candado](imagenes/12-test-https-success.png)
+
+#### Captura 2: Información del Certificado
+Detalle del certificado instalado, mostrando:
+- **Emitido para:** `20.13.67.2`
+- **Organización:** `Lab`
+- **Unidad organizativa:** `IT`
+- **Válido desde:** 24/09/2026 hasta 24/09/2027
+- **Extensión SAN:** `IP:20.13.67.2`
+
+![Información del certificado SSL](imagenes/certificado-info.png)
+
+#### Captura 3: Verificación desde la CLI del ServidorWeb
+Comandos ejecutados en el servidor para confirmar que Apache está activo y los puertos 80 y 443 están escuchando:
+
 ```bash
-sudo mysql -u root
-```
+# Verificar estado del servicio Apache
+sudo systemctl status apache2
 
-### ⚠️ Solución al Error de Política de Contraseñas (ERROR 1819)
-MySQL 8.0 incluye el componente `validate_password` que exige contraseñas complejas. Para un entorno de laboratorio, podemos relajar esta política temporalmente ejecutando:
-
-```sql
--- Bajar la exigencia a LOW (solo verifica longitud)
-SET GLOBAL validate_password.policy = LOW;
-
--- Reducir la longitud mínima a 4 caracteres
-SET GLOBAL validate_password.length = 4;
-```
-
-### Crear la Base de Datos y el Usuario Remoto
-Una vez relajada la política, ejecutamos los comandos de creación:
-
-```sql
--- Crear la base de datos
-CREATE DATABASE lab_db;
-
--- Crear el usuario 'lab_user' que puede conectarse desde CUALQUIER IP ('%')
-CREATE USER 'lab_user'@'%' IDENTIFIED BY 'lab123';
-
--- Otorgar todos los privilegios sobre 'lab_db' al nuevo usuario
-GRANT ALL PRIVILEGES ON lab_db.* TO 'lab_user'@'%';
-
--- Aplicar los cambios y salir
-FLUSH PRIVILEGES;
-EXIT;
-```
-
----
-
-## 3️⃣ Habilitar Acceso Remoto (Bind Address)
-
-Por defecto, MySQL solo escucha en `localhost` (127.0.0.1). Para que el FortiGate y la VLAN de Usuarios puedan llegar a él, debemos cambiarlo a `0.0.0.0`.
-
-### Editar el archivo de configuración
-```bash
-sudo nano /etc/mysql/mysql.conf.d/mysqld.cnf
-```
-
-### Modificar la directiva `bind-address`
-Busca la línea (alrededor de la línea 31) y cámbiala:
-
-```ini
-# Antes:
-# bind-address = 127.0.0.1
-
-# Después:
-bind-address = 0.0.0.0
-```
-*(Opcional: Comenta la línea `mysqlx-bind-address` poniendo un `#` al inicio si aparece).*
-
-Guarda con `Ctrl + O`, presiona `Enter`, y sal con `Ctrl + X`.
-
----
-
-## 4️⃣ Reinicio y Verificación
-
-### Reiniciar el servicio de MySQL
-```bash
-sudo systemctl restart mysql
-```
-
-### Verificar que esté escuchando en todas las interfaces
-```bash
-sudo ss -tlnp | grep 3306
+# Verificar puertos abiertos
+sudo ss -tlnp | grep apache
 ```
 
 **Salida esperada:**
 ```text
-LISTEN 0      70         127.0.0.1:33060      0.0.0.0:*    users:(("mysqld",...))         
-LISTEN 0      151          0.0.0.0:3306       0.0.0.0:*    users:(("mysqld",...))         
+● apache2.service - The Apache HTTP Server
+   Loaded: loaded (/lib/systemd/system/apache2.service; enabled)
+   Active: active (running)
+
+LISTEN 0  511  0.0.0.0:80   0.0.0.0:*  users:(("apache2",...))
+LISTEN 0  511  0.0.0.0:443  0.0.0.0:*  users:(("apache2",...))
 ```
-> ✅ **Nota:** La línea `0.0.0.0:3306` confirma que el servidor acepta conexiones remotas.
 
 ---
 
-## 5️⃣ Prueba de Conexión Remota
+## 🗄️ 2. BaseDeDatos - MySQL Remote Access (Puerto 3306)
 
-Para validar que la configuración es correcta, nos conectamos desde el **ServidorWeb (20.13.67.2)** hacia la **BaseDeDatos (20.13.67.3)**.
+### Configuración Realizada
+- MySQL Server 8.0 instalado y activo en Ubuntu
+- Base de datos `lab_db` creada
+- Usuario remoto `lab_user` creado con acceso desde cualquier IP (`%`)
+- `bind-address` configurado en `0.0.0.0` para aceptar conexiones remotas
+- Puerto 3306 escuchando en todas las interfaces
 
-### Desde el ServidorWeb:
+### ⚠️ Solución al Error de Política de Contraseñas (ERROR 1819)
+MySQL 8.0 incluye el componente `validate_password` que exige contraseñas complejas. Para el laboratorio, se relajó la política temporalmente:
+
+```sql
+SET GLOBAL validate_password.policy = LOW;
+SET GLOBAL validate_password.length = 4;
+```
+
+### Creación de Base de Datos y Usuario Remoto
+```sql
+CREATE DATABASE lab_db;
+CREATE USER 'lab_user'@'%' IDENTIFIED BY 'lab123';
+GRANT ALL PRIVILEGES ON lab_db.* TO 'lab_user'@'%';
+FLUSH PRIVILEGES;
+EXIT;
+```
+
+### Configuración de bind-address
 ```bash
-# Instalar el cliente de MySQL (si no está instalado)
-sudo apt install mysql-client -y
+sudo nano /etc/mysql/mysql.conf.d/mysqld.cnf
+```
+Cambiar:
+```ini
+bind-address = 0.0.0.0
+```
 
-# Conectarse al servidor remoto
+### Reinicio y Verificación
+```bash
+sudo systemctl restart mysql
+sudo ss -tlnp | grep 3306
+```
+
+**Salida obtenida:**
+```text
+LISTEN 0  70  127.0.0.1:33060  0.0.0.0:*  users:(("mysqld",pid=51325,fd=21))
+LISTEN 0  151  0.0.0.0:3306   0.0.0.0:*  users:(("mysqld",pid=51325,fd=23))
+```
+
+> ✅ La línea `0.0.0.0:3306` confirma que MySQL acepta conexiones remotas desde cualquier interfaz de red.
+
+### Evidencia de Funcionamiento
+
+#### Captura 4: Conexión Remota Exitosa desde el ServidorWeb
+Comando ejecutado desde el **ServidorWeb** (`20.13.67.2`) para conectarse al servidor de **BaseDeDatos** (`20.13.67.3`):
+
+```bash
 mysql -h 20.13.67.3 -u lab_user -p
 ```
-*(Contraseña: `lab123`)*
 
-Si el prompt cambia a `mysql>`, la conexión remota es exitosa. Escribe `EXIT;` para salir.
+**Salida esperada:**
+```text
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 20
+Server version: 8.0.46-0ubuntu0.22.04.4 (Ubuntu)
+
+mysql> SHOW DATABASES;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| lab_db             |
++--------------------+
+
+mysql> EXIT;
+Bye
+```
+
+---
+
+## ✅ Resumen de Validación
+
+| Servicio | Servidor | IP | Puerto | Estado | Evidencia |
+| :--- | :--- | :--- | :---: | :---: | :---: |
+| **Apache HTTPS** | ServidorWeb | `20.13.67.2` | 443 | ✅ Activo | Captura 1, 2 y 3 |
+| **MySQL Remote** | BaseDeDatos | `20.13.67.3` | 3306 | ✅ Activo | Captura 4 |
+
+---
+
+## 🔍 Comandos de Verificación Rápida
+
+### Desde el ServidorWeb (`20.13.67.2`):
+```bash
+# Verificar que Apache está corriendo
+sudo systemctl status apache2
+
+# Verificar puertos HTTP y HTTPS
+sudo ss -tlnp | grep -E '80|443'
+
+# Probar acceso local a la web
+curl -k https://localhost
+```
+
+### Desde la BaseDeDatos (`20.13.67.3`):
+```bash
+# Verificar que MySQL está corriendo
+sudo systemctl status mysql
+
+# Verificar puerto 3306
+sudo ss -tlnp | grep 3306
+
+# Verificar usuarios y bases de datos
+sudo mysql -u root -e "SHOW DATABASES; SELECT user, host FROM mysql.user;"
+```
+
+### Prueba de Conectividad entre Servidores:
+```bash
+# Desde ServidorWeb hacia BaseDeDatos
+mysql -h 20.13.67.3 -u lab_user -p
+```
 
 ---
 
@@ -134,4 +221,4 @@ Si el prompt cambia a `mysql>`, la conexión remota es exitosa. Escribe `EXIT;` 
 
 ![Author](https://img.shields.io/badge/Author-Miguel_Ramirez_Meli-orange?style=for-the-badge)
 ![Lab](https://img.shields.io/badge/Lab-FortiGate_VM64-purple?style=for-the-badge)
-![Status](https://img.shields.io/badge/Status-Database_Configured-brightgreen?style=for-the-badge)
+![Status](https://img.shields.io/badge/Status-Services_Validated-brightgreen?style=for-the-badge)
