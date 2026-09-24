@@ -1,4 +1,4 @@
-# ️ Guía de Configuración FortiGate: Topología WAN/LAN con NAT
+# 🛡️ Guía de Configuración FortiGate: Topología WAN/LAN con NAT
 
 ![FortiGate](https://img.shields.io/badge/FortiGate-VM64-red?logo=fortinet&style=for-the-badge)
 ![Network](https://img.shields.io/badge/Network-Topology-blue?style=for-the-badge)
@@ -21,20 +21,26 @@ Esta guía detalla la configuración paso a paso de un FortiGate VM conectando u
 
 ### 🖥️ Configuración mediante GUI
 
-1. Ve a **Network** > **Interfaces**.
-2. Haz doble clic en **port1**.
-3. Configura:
-   - **Alias:** `WAN-ISP`
-   - **Role:** `WAN`
-   - **Addressing mode:** `Manual`
-   - **IP/Network Mask:** `10.10.10.2 / 255.255.255.0`
-   - **Administrative Access:** Marca `PING`, `HTTPS`, `SSH`.
-4. Haz clic en **OK**.
-5. Ve a **Network** > **Static Routes** > **Create New**.
-   - **Destination IP/Mask:** `0.0.0.0 / 0.0.0.0`
-   - **Device:** `port1`
-   - **Gateway:** `10.10.10.1`
-6. Haz clic en **OK**.
+#### Tabla 1 — Configuración de la Interfaz Port1 (WAN)
+
+| Campo | Valor |
+| :--- | :--- |
+| **Ruta en el menú** | `Network` > `Interfaces` |
+| **Interfaz** | `port1` |
+| **Alias** | `WAN-ISP` |
+| **Role** | `WAN` |
+| **Addressing mode** | `Manual` |
+| **IP/Network Mask** | `10.10.10.2 / 255.255.255.0` |
+| **Administrative Access** | `PING`, `HTTPS`, `SSH` |
+
+#### Tabla 2 — Configuración de la Ruta por Defecto (Static Route)
+
+| Campo | Valor |
+| :--- | :--- |
+| **Ruta en el menú** | `Network` > `Static Routes` > `Create New` |
+| **Destination IP/Mask** | `0.0.0.0 / 0.0.0.0` |
+| **Device** | `port1` |
+| **Gateway** | `10.10.10.1` |
 
 ### 💻 Configuración mediante CLI
 
@@ -63,25 +69,23 @@ end
 
 ### 🖥️ Configuración mediante GUI
 
-#### Paso 1 — Configurar Port2 (LAN-USUARIOS)
-
-1. Ve a **Network** > **Interfaces**.
-2. Haz doble clic en **port2**:
-   - **Alias:** `LAN-USUARIOS`
-   - **Role:** `LAN`
-   - **Addressing mode:** `Manual`
-   - **IP/Network Mask:** `10.13.67.1 / 255.255.255.128`
-   - **Administrative Access:** Marca `PING`, `HTTPS`, `SSH`.
-3. Haz clic en **OK**.
-
-#### Paso 2 — Configurar DHCP Server en Port2 (LAN-USUARIOS)
-
-1. Ve a **Network** > **Interfaces**.
-2. Haz doble clic en **port2** (LAN-USUARIOS).
-3. Desplázate hasta la sección **DHCP Server** y configúralo así:
+#### Tabla 3 — Configuración de la Interfaz Port2 (LAN-USUARIOS)
 
 | Campo | Valor |
 | :--- | :--- |
+| **Ruta en el menú** | `Network` > `Interfaces` |
+| **Interfaz** | `port2` |
+| **Alias** | `LAN-USUARIOS` |
+| **Role** | `LAN` |
+| **Addressing mode** | `Manual` |
+| **IP/Network Mask** | `10.13.67.1 / 255.255.255.128` |
+| **Administrative Access** | `PING`, `HTTPS`, `SSH` |
+
+#### Tabla 4 — Configuración del DHCP Server en Port2 (LAN-USUARIOS)
+
+| Campo | Valor |
+| :--- | :--- |
+| **Ruta en el menú** | `Network` > `Interfaces` > `port2` > `DHCP Server` |
 | **DHCP status** | `Enabled` |
 | **Address range** | `10.13.67.10 - 10.13.67.126` |
 | **Netmask** | `255.255.255.128` |
@@ -89,21 +93,20 @@ end
 | **DNS server** | `Same as Interface IP` |
 | **Lease time** | `604800` seconds (7 días) |
 
-4. Haz clic en **OK**.
+#### Tabla 5 — Configuración de la Interfaz Port3 (LAN-SERVIDORES)
 
-#### Paso 3 — Configurar Port3 (LAN-SERVIDORES)
+| Campo | Valor |
+| :--- | :--- |
+| **Ruta en el menú** | `Network` > `Interfaces` |
+| **Interfaz** | `port3` |
+| **Alias** | `LAN-SERVIDORES` |
+| **Role** | `LAN` |
+| **Addressing mode** | `Manual` |
+| **IP/Network Mask** | `20.13.67.1 / 255.255.255.248` |
+| **Administrative Access** | `PING`, `HTTPS`, `SSH` |
+| **DHCP Server** | `Disabled` (los servidores tienen IPs estáticas) |
 
-1. Ve a **Network** > **Interfaces**.
-2. Haz doble clic en **port3**:
-   - **Alias:** `LAN-SERVIDORES`
-   - **Role:** `LAN`
-   - **Addressing mode:** `Manual`
-   - **IP/Network Mask:** `20.13.67.1 / 255.255.255.248`
-   - **Administrative Access:** Marca `PING`, `HTTPS`, `SSH`.
-   - **DHCP Server:** `Disabled` (los servidores tienen IPs estáticas).
-3. Haz clic en **OK**.
-
-###  Configuración mediante CLI
+### 💻 Configuración mediante CLI
 
 ```bash
 config system interface
@@ -140,25 +143,26 @@ end
 
 ---
 
-## 🟠 PARTE 3: Políticas de Firewall y NAT (Salida a Internet)
+##  PARTE 3: Políticas de Firewall y NAT (Salida a Internet)
 
 Para que los usuarios y servidores puedan navegar, debemos crear una política que permita el tráfico desde las LAN hacia la WAN, activando **NAT**.
 
-### ️ Configuración mediante GUI
+### 🖥️ Configuración mediante GUI
 
-1. Ve a **Policy & Objects** > **Firewall Policy**.
-2. Haz clic en **Create New**.
-3. Configura:
-   - **Name:** `LAN_to_WAN_NAT`
-   - **Incoming Interface:** Selecciona `LAN-USUARIOS` y `LAN-SERVIDORES` (mantén presionado Ctrl para seleccionar ambas).
-   - **Outgoing Interface:** Selecciona `WAN-ISP`.
-   - **Source:** `all`
-   - **Destination:** `all`
-   - **Schedule:** `always`
-   - **Service:** `ALL`
-   - **Action:** `ACCEPT`
-   - **NAT:** **ACTIVADO** (Switch en ON).
-4. Haz clic en **OK**.
+#### Tabla 6 — Configuración de la Política de Firewall con NAT
+
+| Campo | Valor |
+| :--- | :--- |
+| **Ruta en el menú** | `Policy & Objects` > `Firewall Policy` > `Create New` |
+| **Name** | `LAN_to_WAN_NAT` |
+| **Incoming Interface** | `LAN-USUARIOS`, `LAN-SERVIDORES` |
+| **Outgoing Interface** | `WAN-ISP` |
+| **Source** | `all` |
+| **Destination** | `all` |
+| **Schedule** | `always` |
+| **Service** | `ALL` |
+| **Action** | `ACCEPT` |
+| **NAT** | `Enabled` (Switch en ON) |
 
 ### 💻 Configuración mediante CLI
 
@@ -202,7 +206,7 @@ execute ping 10.10.10.1
 
 <br>
 
-### 👨‍ Realizado por: **Miguel Ramirez Meli**
+### 👨‍💻 Realizado por: **Miguel Ramirez Meli**
 
 ![Author](https://img.shields.io/badge/Author-Miguel_Ramirez_Meli-orange?style=for-the-badge)
 ![Lab](https://img.shields.io/badge/Lab-FortiGate_VM64-purple?style=for-the-badge)
