@@ -24,9 +24,42 @@ sudo apt upgrade -y
 
 ### 1.2 Instalación de Apache y PHP
 
+> ⚠️ **Si ya aplicaste la Parte 3 (restricción de tráfico con `ufw`) antes de este paso**, el ServidorWeb no podrá salir a Internet para descargar paquetes. Verifica con `sudo ufw status`; si ya está activo con `deny (outgoing)` por defecto, abre temporalmente la salida:
+> ```bash
+> sudo ufw allow out 80/tcp
+> sudo ufw allow out 443/tcp
+> sudo ufw allow out 53
+> ```
+> Instala los paquetes, y al terminar esta parte **ciérralas de nuevo** (ver nota al final de la Parte 1).
+
 ```bash
 sudo apt install apache2 php libapache2-mod-php php-mysql openssl -y
 ```
+
+### 1.2.1 Habilitar el módulo PHP en Apache
+
+La instalación no siempre habilita el módulo automáticamente. Verifica y habilítalo:
+
+```bash
+ls /etc/apache2/mods-available/ | grep php
+```
+
+Con el número de versión que aparezca (ej. `php8.1`):
+
+```bash
+sudo a2enmod php8.1
+sudo systemctl restart apache2
+```
+
+**Cómo confirmar que PHP se está ejecutando (y no solo mostrando el código fuente):**
+
+```bash
+curl -k "https://localhost/buscar.php?q=teclado"
+```
+
+- Si la respuesta es el **código fuente del PHP tal cual** (`<?php mysqli_report(...`), el módulo no está habilitado: repite el `a2enmod` de arriba.
+- Si la respuesta es un error de SQL (`Table 'lab_db.productos' doesn't exist`), PHP sí está funcionando: falta crear la tabla (Parte 2.5).
+- Si la respuesta es `1 - Teclado - 25.50`, todo quedó correcto.
 
 ### 1.3 Inicio y habilitación de Apache
 
@@ -159,6 +192,28 @@ curl -k "https://20.13.67.2/buscar.php?q=teclado"
 
 La segunda solo responde con datos una vez creada la tabla `productos` (Parte 2.5).
 
+### 1.12 Cerrar el firewall si lo abriste para instalar paquetes
+
+Si abriste la salida temporalmente en el paso 1.2, ciérrala ahora que ya terminaste de instalar todo (esto se hace **después** de completar también la Parte 2 y crear la tabla, para no tener que reabrirla de nuevo):
+
+```bash
+sudo ufw delete allow out 80/tcp
+sudo ufw delete allow out 443/tcp
+sudo ufw delete allow out 53
+sudo ufw status verbose
+```
+
+En la sección de salida (`OUT`) solo debe quedar:
+```text
+20.13.67.3 3306/tcp        ALLOW OUT   Anywhere
+```
+
+Verifica que el aislamiento quedó correcto:
+```bash
+ping 8.8.8.8              # debe fallar
+nc -zv 20.13.67.3 3306    # debe conectar
+```
+
 ---
 
 ## 🗄️ PARTE 2: BaseDeDatos (20.13.67.3)
@@ -206,6 +261,8 @@ sudo mysql_secure_installation
 
 ### 2.5 Base de datos, tabla y usuario restringido al ServidorWeb
 
+> ⚠️ **Ejecutar todo este bloque en el BaseDeDatos (`20.13.67.3`)**, con `sudo mysql -u root` (acceso local, sin restricción de host). Confirma en qué máquina estás con `ip a` antes de continuar: debe mostrar `20.13.67.3`, no `20.13.67.2`.
+
 ```bash
 sudo mysql -u root
 ```
@@ -229,10 +286,27 @@ CREATE USER 'lab_user'@'20.13.67.2' IDENTIFIED BY 'lab123';
 GRANT ALL PRIVILEGES ON lab_db.* TO 'lab_user'@'20.13.67.2';
 
 FLUSH PRIVILEGES;
+
+-- Verificar que la tabla quedó creada
+SELECT * FROM lab_db.productos;
+
 EXIT;
 ```
 
+**Salida esperada del `SELECT`:**
+```text
++----+---------+--------+
+| id | nombre  | precio |
++----+---------+--------+
+|  1 | Teclado |  25.50 |
+|  2 | Mouse   |  12.00 |
+|  3 | Monitor | 180.00 |
++----+---------+--------+
+```
+
 Limitar el usuario a `20.13.67.2` (en vez de `%`) hace que, aunque alguien de Usuarios llegara por red al puerto 3306, MySQL rechace el login porque no viene de esa IP exacta. Es una segunda capa de seguridad, además de las políticas del FortiGate.
+
+> ⚠️ **No pruebes `mysql -h 20.13.67.3 -u lab_user -p` estando dentro de la propia BaseDeDatos.** MySQL vería la conexión como si viniera de `20.13.67.3`, no de `20.13.67.2`, y la rechazaría (`Access denied for user 'lab_user'@'20.13.67.3'`) aunque la contraseña sea correcta. Esa prueba de conectividad remota (Parte 3) se hace **desde el ServidorWeb**.
 
 ### 2.6 bind-address para acceso remoto
 
