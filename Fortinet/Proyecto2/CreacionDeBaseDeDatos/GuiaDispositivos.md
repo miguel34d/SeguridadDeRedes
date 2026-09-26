@@ -8,7 +8,7 @@
 
 Configuración de los dos servidores de la VLAN 20 (DMZ):
 
-- **ServidorWeb** (`20.13.67.2`) — Apache con HTTPS, certificado SSL con SAN, y una página en PHP conectada a la base de datos.
+- **ServidorWeb** (`20.13.67.2`) — Apache con HTTPS, certificado SSL con SAN, una página en PHP conectada a la base de datos, y archivos de prueba para el filtrado de `.exe` en el FortiGate.
 - **BaseDeDatos** (`20.13.67.3`) — MySQL Server, con acceso remoto habilitado solo para el ServidorWeb.
 
 ---
@@ -24,7 +24,7 @@ sudo apt upgrade -y
 
 ### 1.2 Instalación de Apache y PHP
 
-> ⚠️ **Si ya aplicaste la Parte 3 (restricción de tráfico con `ufw`) antes de este paso**, el ServidorWeb no podrá salir a Internet para descargar paquetes. Verifica con `sudo ufw status`; si ya está activo con `deny (outgoing)` por defecto, abre temporalmente la salida:
+> ⚠️ **Si ya aplicaste la Parte 4 (restricción de tráfico con `ufw`) antes de este paso**, el ServidorWeb no podrá salir a Internet para descargar paquetes. Verifica con `sudo ufw status`; si ya está activo con `deny (outgoing)` por defecto, abre temporalmente la salida:
 > ```bash
 > sudo ufw allow out 80/tcp
 > sudo ufw allow out 443/tcp
@@ -171,7 +171,30 @@ while ($row = $result->fetch_assoc()) {
 }
 ```
 
-### 1.10 Verificación de puertos
+### 1.10 Archivos de prueba para el filtrado de .exe (File Filter)
+
+Estos archivos se usan para demostrar el perfil `File Filter` del FortiGate: un `.exe` que debe bloquearse, y un `.txt` de control que debe descargar sin problema (para confirmar que el bloqueo es específico al tipo de archivo, no una restricción general).
+
+```bash
+sudo mkdir -p /var/www/html/descargas
+
+echo "archivo de prueba, no es un ejecutable real" | sudo tee /var/www/html/descargas/prueba.exe
+echo "contenido normal" | sudo tee /var/www/html/descargas/prueba.txt
+
+ls -la /var/www/html/descargas/
+```
+
+**Prueba local** (esto no pasa por el FortiGate, solo confirma que Apache los sirve):
+
+```bash
+curl -k "https://localhost/descargas/prueba.txt"
+```
+
+Debe mostrar "contenido normal".
+
+> ⚠️ **Importante:** para probar el bloqueo real desde el FortiGate, la descarga debe hacerse desde la máquina de Usuarios hacia `https://20.13.67.2/descargas/prueba.exe`, no en local. Evita también probar contra sitios externos "generadores de archivos" (como byterivet.com o file-examples.com): esos crean el archivo con JavaScript dentro del navegador (`blob:`), sin que ningún byte viaje por la red, así que el File Filter no puede interceptarlos. La configuración del perfil `FF-NoEXE` y las pruebas completas desde Windows están documentadas en `file-filter-exe.md`.
+
+### 1.11 Verificación de puertos
 
 ```bash
 sudo ss -tlnp | grep apache
@@ -183,7 +206,7 @@ LISTEN 0  511  0.0.0.0:80   0.0.0.0:*  users:(("apache2",...))
 LISTEN 0  511  0.0.0.0:443  0.0.0.0:*  users:(("apache2",...))
 ```
 
-### 1.11 Pruebas locales
+### 1.12 Pruebas locales
 
 ```bash
 curl -k https://localhost
@@ -192,7 +215,7 @@ curl -k "https://20.13.67.2/buscar.php?q=teclado"
 
 La segunda solo responde con datos una vez creada la tabla `productos` (Parte 2.5).
 
-### 1.12 Cerrar el firewall si lo abriste para instalar paquetes
+### 1.13 Cerrar el firewall si lo abriste para instalar paquetes
 
 Si abriste la salida temporalmente en el paso 1.2, ciérrala ahora que ya terminaste de instalar todo (esto se hace **después** de completar también la Parte 2 y crear la tabla, para no tener que reabrirla de nuevo):
 
@@ -371,6 +394,7 @@ EXIT;
 | :--- | :--- | :--- | :---: | :--- |
 | Apache HTTP/HTTPS | ServidorWeb | `20.13.67.2` | 80 / 443 | Usuarios (VLAN 10) vía FortiGate |
 | `buscar.php` | ServidorWeb | `20.13.67.2` | 443 | Consulta a la base de datos |
+| `/descargas/prueba.exe` y `.txt` | ServidorWeb | `20.13.67.2` | 443 | Archivos de prueba para File Filter |
 | MySQL Server | BaseDeDatos | `20.13.67.3` | 3306 | Solo `lab_user`@`20.13.67.2` |
 
 ---
@@ -382,6 +406,8 @@ EXIT;
 sudo systemctl status apache2
 sudo ss -tlnp | grep -E '80|443'
 curl -k "https://20.13.67.2/buscar.php?q=teclado"
+curl -k "https://localhost/descargas/prueba.txt"
+ls -la /var/www/html/descargas/
 ```
 
 **BaseDeDatos:**
